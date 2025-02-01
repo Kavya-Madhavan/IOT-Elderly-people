@@ -1,0 +1,183 @@
+#include <LiquidCrystal_I2C.h>
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+#include <Wire.h>
+#include <SoftwareSerial.h>
+#include <Adafruit_BMP085.h>
+#define seaLevelPressure_hPa 1013.25
+Adafruit_BMP085 bmp;
+SoftwareSerial serial1(2,3);
+long instance1=0, timer;
+double hrv =0, hr = 72, interval = 0;
+int value = 0, count = 0;
+bool flag = 0;
+#define shutdown_pin 4
+String msg="";String number = "9488991044";
+SoftwareSerial gsm(2,3);
+#define threshold 100 // to identify R peak
+#define timer_value 10000 // 10 seconds timer to calculate hr
+int i=0;
+int j=0;int l=0;
+int k=0;int k1=0;
+void setup()
+{
+pinMode(6, INPUT); // Setup for leads off detection LO +
+pinMode(7, INPUT); // Setup for leads off detection LO -
+pinMode(2,OUTPUT);
+pinMode(3,OUTPUT);
+Serial.begin(9600);
+serial1.begin(9600);
+digitalWrite(2,LOW);
+digitalWrite(3,LOW);
+Serial.begin(9600);
+gsm.begin(9600); //assign gsm buadrate
+gsm.println("AT+CMGF=1\r"); //gsm text mode
+delay(1000);
+gsm.println("AT+CNMI=2,2,0,0,0\r"); //read new sms mode
+delay(1000);
+gsm.println("AT+CMGD=1,4"); //delete sms
+delay(1000);
+lcd.init();
+lcd.backlight(); 
+lcd.clear();
+lcd.setCursor(0,0);
+lcd.print("..HEALTH.......");
+lcd.setCursor(0, 1) ;
+lcd.print("Monitoring..");
+lcd.print(" ");
+ if (!bmp.begin()) {
+Serial.println("Could not find a valid BMP085 sensor, check wiring!")
+while (1) {}
+}
+}
+void loop() {
+i++;
+lcd.print("..HEALTH.......");
+lcd.setCursor(0, 1) ;
+lcd.print("Monitoring..");
+lcd.print(i);
+lcd.print(" ");
+ if((digitalRead(6) == 1)||(digitalRead(7) == 1)){
+//Serial.println("leads off!");
+digitalWrite(shutdown_pin, LOW); //standby mode 
+instance1 = micros();
+timer = millis();
+}
+else {
+digitalWrite(shutdown_pin, HIGH); //normal mode
+value = analogRead(A3);
+value = map(value, 250, 400, 0, 100); //to flatten the ecg values a bit
+if((value > threshold) && (!flag)) {
+count++;
+Serial.println("in");
+flag = 1;
+interval = micros() - instance1; //RR interval
+instance1 = micros();
+}
+else if((value < threshold)) {
+flag = 0;
+}
+If ((millis() - timer) > 10000) {
+hr = count*6;
+timer = millis();
+count = 0;
+}
+hrv = hr/60 - interval/1000000;
+// Serial.print(hr);
+// Serial.print(",");
+// Serial.print(hrv);
+// Serial.print(",");
+// Serial.println(value);
+// lcd.setCursor(0,0);
+// lcd.print("HR ");
+// lcd.setCursor(0, 1) ;
+// lcd.print(hr);
+// lcd.print(" ");
+//delay(1000);
+}
+k=analogRead(A0); if (k>= 550)
+{
+j++;
+}
+if(i==120)
+{
+lcd.setCursor(0,0);
+lcd.print("HB:");
+lcd.print(j);
+lcd.print(" ");
+delay(1000); lcd.clear();
+lcd.setCursor(0,0);
+lcd.print("HR ");
+lcd.setCursor(0, 1) ;
+lcd.print(hr); lcd.print("
+")
+delay(1000);
+lcd.clear(); 
+lcd.setCursor(0,0);
+lcd.print("T:"); lcd.print(bmp.readTemperature());
+lcd.setCursor(0, 1) ;
+lcd.print("P:");lcd.print(bmp.readPressure());
+lcd.print(" ");
+Serial.print(j);
+Serial.print("&");
+Serial.print(bmp.readTemperature());
+Serial.print("&");
+Serial.print(bmp.readPressure());
+delay(1000);
+//
+ if(j<=50)
+{
+// serial1.println("HB LOW");
+// serial1.print(" HB:");
+// serial1.print(j);
+// serial1.print(" SPO2:");
+// serial1.print((((int)humidity)*j/40)) // delay(1000);
+msg = "HB LOW";
+// digitalWrite(buzzer,HIGH); 
+sms();
+delay(2000);
+delay(5000);
+call();
+delay(2000);
+delay(5000); //digitalWrite(buzzer,LOW);
+}
+if(j>=119)
+{
+// serial1.println("*HB HIGH");
+// serial1.print(" HB:");
+// serial1.print(j);
+// serial1.print(" SPO2:");
+// serial1.print((((int)humidity)*j/40));
+// delay(1000);
+msg = "HB HIGH";
+// digitalWrite(buzzer,HIGH);
+sms();
+delay(2000);
+delay(5000);
+call();
+delay(2000);
+delay(5000); // digitalWrite(buzzer,LOW);
+}
+ j = 0;
+i = 0;
+}
+delay(100)}
+}
+void sms(){
+delay(100);
+gsm.println("AT+CMGF=1"); //Sets the GSM Module in Text Mode
+delay(500);
+gsm.println("AT+CMGS=\"+91"+number+"\"\r"); //assign reciver`s number
+delay(1000);gsm.println(msg);
+Serial.print(msg);
+delay(500);
+gsm.println((char)26);// ASCII code of CTRL+Z
+delay(1000);
+// digitalWrite(buzzer,1);
+delay(5000);
+}
+void call()
+{
+gsm.print("ATD+ ");
+gsm.print("+91"+number);
+gsm.println(";"); delay(5000);
+}
